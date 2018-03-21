@@ -76,15 +76,6 @@ namespace UnusedCodePlugin
         
         bool VisitDecl(Decl *decl){
 
-            static ObjCInterfaceDecl *lastInterfaceDecl;
-            //@interface
-            if(isa<ObjCInterfaceDecl>(decl))
-            {
-                ObjCInterfaceDecl *interDecl = (ObjCInterfaceDecl*)decl;
-                if (interDecl->getSuperClass()) {
-                    lastInterfaceDecl = interDecl;
-                }
-            }
             //@implementation
             static ObjCImplementationDecl *lastImpDecl ;
             static ObjCCategoryImplDecl *lastCategoryImpDecl;
@@ -92,12 +83,13 @@ namespace UnusedCodePlugin
             {
                 lastImpDecl = (ObjCImplementationDecl *)decl;
                 UnusedCodeUtil::setClassName(lastImpDecl->getNameAsString());
-//                cout<<"ObjCImplementationDecl:"<<lastImpDecl->getNameAsString()<<endl;
-                //
                 lastCategoryImpDecl = NULL;
                 //继承
-                if (lastInterfaceDecl && !lastInterfaceDecl->getNameAsString().compare(lastImpDecl->getNameAsString())) {
-                    UnusedCodeUtil::appendCalleeClass(lastInterfaceDecl->getSuperClass()->getNameAsString());
+                if (lastImpDecl->getClassInterface()) {
+                    ObjCInterfaceDecl *interfaceDecl = lastImpDecl->getClassInterface();
+                    if (interfaceDecl->getSuperClass()) {
+                        UnusedCodeUtil::appendCalleeClass(interfaceDecl->getSuperClass()->getNameAsString());
+                    }
                 }
             }
             if (isa<ObjCCategoryImplDecl>(decl)) {
