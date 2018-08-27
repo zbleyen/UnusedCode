@@ -17,6 +17,7 @@
 #include <fstream>
 #include <iterator>
 #include "json.hpp"
+#include "dijkstra.cpp"
 
 using namespace std;
 using namespace nlohmann;
@@ -47,7 +48,13 @@ vector<string> split(const string &s, char delim) {
     return elems;
 }
 
-bool has_prefix(const string &str, const string &prefix)
+static inline bool has_suffix(const std::string &str, const std::string &suffix)
+{
+    return str.size() >= suffix.size() &&
+    str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+static inline bool has_prefix(const std::string &str, const std::string &prefix)
 {
     return str.size() >= prefix.size() &&
     str.compare(0, prefix.size(), prefix) == 0;
@@ -69,6 +76,24 @@ bool writeJsonToFile(json j, string filename){
     ofs<<j<<endl;
     //    cout<<filename<<":"<<endl;
     //    cout<<j<<endl;
+    ofs.close();
+    return true;
+}
+
+bool writeToFileAtBegin(string content, string filename) {
+    fstream fs;
+    string oldContent;
+    fs.open (filename,std::fstream::in | std::fstream::out);
+    fs >> oldContent;
+    fs << content + oldContent;
+    fs.close();
+    return true;
+}
+
+bool writeToFileAtEnd(string content, string filename) {
+    ofstream ofs;
+    ofs.open (filename,ofstream::app);
+    ofs<<content<<endl;
     ofs.close();
     return true;
 }
@@ -289,15 +314,13 @@ vector<string> unusedClass (json callees,vector<string> whiteList){
 }
 
 
+
 int main(int argc, const char * argv[]) {
     if(argc!=2){
         cout<<"Usage:"<<"postanalyze your-path-of-jsonparts-for-analyzing your-appdelegate-name"<<endl;
         return -1;
     }
     string folder(argv[1]);
-    //whiteList
-    vector<string> whiteListClass = mergeVectorJsonFiles(jsonPartFiles(folder,"classWhiteList.json"));
-    whiteListClass.push_back(string("main()"));
 
     //callee
     json callees = mergeMapJsonFiles(jsonPartFiles(folder,"classCallees.json"));
@@ -308,7 +331,19 @@ int main(int argc, const char * argv[]) {
     cout << "category:" << category <<endl;
     cout <<"_______"<<endl;
     callees = preprocessCallees(callees,category);
+    
+    //whiteList
+    vector<string> whiteListClass = mergeVectorJsonFiles(jsonPartFiles(folder,"classWhiteList.json"));
+    
+    // produce edges of calling relation graph for d3js visualization
+    json edges = edgesForD3js(callees, whiteListClass);
+    writeJsonToFile(edges, folder + "/origin.js");
+    writeToFileAtBegin("var dependencies = ", folder + "/origin.js");
+    writeToFileAtEnd(";", folder + "/origin.js");
 
+    //put main() in whiteList
+    whiteListClass.push_back(string("main()"));
+    
     // init usedCount
     for (json::iterator it = callees.begin(); it != callees.end(); ++it) {
         string key = it.key();

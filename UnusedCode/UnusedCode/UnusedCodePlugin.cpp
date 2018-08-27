@@ -206,7 +206,9 @@ namespace UnusedCodePlugin
     {
     public:
         unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &Compiler,StringRef InFile){
+//            cout << "lastFileName: "<<gFileName<<endl;
             gFileName = InFile.str();
+//            cout << "newFileName: "<<gFileName<<endl;
             return unique_ptr<UnusedCodeASTConsumer>(new UnusedCodeASTConsumer);
         }
         bool ParseArgs(const CompilerInstance &CI, const std::vector<std::string>& args){
