@@ -10,6 +10,7 @@
 
 string gSrcRootPath = "";
 string gFileName = "";
+string gRightHeaderFileName = "";
 
 string classWhiteList = "classWhiteList";
 string classCallees = "classCallees";
@@ -17,8 +18,11 @@ string classCallees = "classCallees";
 
 json classWhiteListJson;
 //json classListJson;
-json classCalleesJson;
+//json classCalleesJson;
 json functionCalleesJson;
+json relatedClassesJson;    //[类名：[相关类名:次数]]
+json currentClassJson;
+json wholeJson;
 json categoryImpJson;
 
 vector<string>  classCalleesVector;
@@ -35,16 +39,34 @@ string removeBackSlash(string s) {
         str.erase (remove(str.begin(), str.end(), cs2Remove.at(i)), str.end());
     return str;
 }
-
+void clsVisitEnd(string clsName) {
+    currentClassJson[string("methods")] = functionCalleesJson;
+    currentClassJson[string("relatedClasses")] = relatedClassesJson[clsName];
+    wholeJson[className] = currentClassJson;
+    functionCalleesJson.clear();
+    currentClassJson.clear();
+}
 
 void UnusedCodeUtil::setClassName(string clsName){
     if(!clsName.length())
         return;
     if (className.length() && className.compare(clsName)) {
-        functionCalleesJson[className] = classCalleesJson;
-        classCalleesJson = json();
+        clsVisitEnd(className);
     }
     className = clsName;
+}
+
+void UnusedCodeUtil::setRelatedClsWithClass(string relatedCls, string thisCls) {
+    json relatedJson = relatedClassesJson[thisCls];
+    if (relatedJson.is_null()) {
+        relatedJson[relatedCls] = 1;
+    }
+    relatedClassesJson[thisCls] = relatedJson;
+}
+
+
+void UnusedCodeUtil::setSuperClassName(string spClsName) {
+    currentClassJson[string("superClass")] = spClsName;
 }
 
 
@@ -60,7 +82,7 @@ bool UnusedCodeUtil::writeJsonToFile(json j, string filename){
     ofstream ofs;
     ofs.open (filename,ofstream::out);
     ofs<<j<<endl;
-//    cout<<filename<<":"<<endl;
+//    cout<<"zbdebug fileName :"<<filename<<endl;
 //    cout<<j<<endl;
     ofs.close();
     return true;
@@ -74,20 +96,20 @@ void increaseUsedCount(json &j, string key) {
     }
 }
 
-void UnusedCodeUtil::appendCalleeClass(string cls) {
+void UnusedCodeUtil::appendCalleeClass(string callee) {
     
     if (functionName.length()) {
         json funcCallees = functionCalleesJson[functionName];
         if (funcCallees.is_null()) {
-            funcCallees[cls] = 1;
+            funcCallees[callee] = 1;
             
         } else {
-            increaseUsedCount(funcCallees, cls);
+            increaseUsedCount(funcCallees, callee);
         }
         functionCalleesJson[functionName] = funcCallees;
         return;
     }
-    increaseUsedCount(classCalleesJson,cls);
+//    increaseUsedCount(classCalleesJson,callee);
 
 }
 
@@ -120,21 +142,21 @@ void UnusedCodeUtil::synchronize(){
         cout<<"[KWLM]:Nofilename"<<endl;
     }
     if (className.length()) {
-        functionCalleesJson[className] = classCalleesJson;
+        clsVisitEnd(className);
     }
     
     //记录文件路径
     json filePathJson;
-    for (json::iterator it = functionCalleesJson.begin(); it != functionCalleesJson.end(); ++it) {
-        string className = it.key();
-        filePathJson[className] = gFileName;
-    }
-    writeJsonToFile(filePathJson, gSrcRootPath+"/Analyzer/"+fileprefix+".filePath.json");
+    string fileName = lastComponentOfFile(gFileName);
+    filePathJson[fileName] = gFileName;
     
-    writeJsonToFile(functionCalleesJson, gSrcRootPath+"/Analyzer/"+fileprefix+".classCallees.json");
-//    cout<<"functionCalleesJson: "<<functionCalleesJson<<endl;
+    writeJsonToFile(filePathJson, gSrcRootPath+"/Analyzer/"+fileprefix+".filePath.json");
+    json fileJson;
+    fileJson[fileName] = wholeJson;
+    writeJsonToFile(fileJson, gSrcRootPath+"/Analyzer/"+fileprefix+".classCallees.json");
+
 //    cout <<"fileName: "<< gSrcRootPath+"/Analyzer/"+fileprefix+".classCallees.json"<<endl;
-    writeJsonToFile(classWhiteListJson, gSrcRootPath+"/Analyzer/"+fileprefix+".classWhiteList.json");
-    writeJsonToFile(categoryImpJson, gSrcRootPath + "/Analyzer/" + fileprefix + ".category.json");
+//    writeJsonToFile(classWhiteListJson, gSrcRootPath+"/Analyzer/"+fileprefix+".classWhiteList.json");
+//    writeJsonToFile(categoryImpJson, gSrcRootPath + "/Analyzer/" + fileprefix + ".category.json");
 //    writeJsonToFile(classListJson, gSrcRootPath+"/Analyzer/"+fileprefix+".classList.json");
 }
